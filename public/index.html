@@ -2,6 +2,7 @@
 <html lang="hi">
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>प्राइवेट कॉल</title>
   <style>
@@ -16,9 +17,9 @@
     .status { font-size: 18px; margin-bottom: 20px; font-weight: bold; }
     .video-container { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
     video {
-      width: 45%; max-width: 500px;
-      border-radius: 15px;
-      border: 3px solid rgba(255,255,255,0.3);
+      width: 50%; max-width: 500px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.3);
       box-shadow: 0 8px 20px rgba(0,0,0,0.3);
       background: black;
     }
@@ -45,12 +46,14 @@
   </div>
 
   <div class="controls">
-    <button id="video-call-btn">📹 वीडियो कॉल</button>
-    <button id="audio-call-btn">🎤 ऑडियो कॉल</button>
-    <button id="end-btn">❌ कॉल समाप्त करें</button>
+    <button id="video-call-btn">
+  <i class="fas fa-video"></i> वीडियो कॉल
+</button>
+<button id="audio-call-btn">
+  <i class="fas fa-microphone"></i> ऑडियो कॉल
+</button>
+        <button id="end-btn">❌ कॉल समाप्त करें</button>
     <!-- Extra Controls -->
-    <button onclick="toggleFullScreen()">📺 Full Screen</button>
-
     <button id="mute-btn" class="extra">🔇 म्यूट</button>
     <button id="video-toggle-btn" class="extra">📷 बंद</button>
     <button id="camera-switch-btn" class="extra">🔄 कैमरा</button>
@@ -128,21 +131,6 @@
       remoteVideo.muted = !speakerOn;
       speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
     };
-
-    // ✅ FULL SCREEN (mobile browsers में limited support)
-function toggleFullScreen() {
-  let video = document.getElementById("remoteVideo");
-  if (!document.fullscreenElement) {
-    video.requestFullscreen().catch(err => {
-      alert(`Error: ${err.message}`);
-    });
-  } else {
-    document.exitFullscreen();
-  }
-}
-
-
-    
 
     async function startCall(mediaConstraints) {
       videoCallBtn.style.display = 'none';
