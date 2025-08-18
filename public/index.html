@@ -3,62 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>एडवांस वीडियो कॉल</title>
+  <title>प्राइवेट कॉल</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
+      text-align: center;
       background: linear-gradient(135deg, #667eea, #764ba2);
-      margin: 0; padding: 0; color: white;
-      display: flex; flex-direction: column; align-items: center;
+      margin: 0; padding: 20px;
+      color: white;
     }
-    h1 { margin: 15px; }
-    .status { font-size: 18px; margin-bottom: 10px; font-weight: bold; }
+
+    h1 { margin-bottom: 10px; }
+
+    .status {
+      font-size: 18px;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
     .video-container {
-      display: flex; justify-content: center; gap: 15px; margin: 10px;
+      display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;
     }
+
     video {
-      width: 45%; max-width: 500px; border-radius: 15px;
-      background: black; border: 2px solid rgba(255,255,255,0.3);
+      width: 45%; max-width: 500px;
+      border-radius: 15px;
+      border: 3px solid rgba(255,255,255,0.3);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      background: black;
     }
+
     .controls {
-      display: flex; justify-content: center; gap: 15px; margin-top: 15px;
-      flex-wrap: wrap;
+      display: flex; justify-content: center; gap: 15px;
     }
-    .controls button {
-      width: 55px; height: 55px; border-radius: 50%;
-      border: none; cursor: pointer; font-size: 20px;
-      color: white; display: flex; justify-content: center; align-items: center;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: 0.3s;
+
+    button {
+      padding: 12px 25px;
+      font-size: 16px;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: 0.3s;
+      font-weight: bold;
     }
-    .controls button:hover { transform: scale(1.1); }
-    #video-call-btn { background: #00c853; }
-    #audio-call-btn { background: #2196F3; }
-    #end-btn { background: #f44336; display: none; }
-    #mute-btn { background: #ff9800; display: none; }
-    #camera-btn { background: #9c27b0; display: none; }
-    #switch-cam-btn { background: #795548; display: none; }
-    #speaker-btn { background: #009688; display: none; }
-    #switch-mode-btn { background: #673ab7; display: none; }
+
+    button:hover { transform: scale(1.05); }
+
+    #video-call-btn { background: #00c853; color: white; }
+    #audio-call-btn { background: #2196F3; color: white; }
+    #end-btn { background: #f44336; color: white; display: none; }
   </style>
 </head>
 <body>
-  <h1></h1
-  <div class="status" id="call-status">📴 कोई कॉल नहीं</div>
+  <h1></h1>
+  <div class="status" id="call-status">कोई कॉल शुरू नहीं है</div>
 
   <div class="video-container">
-    <video id="local-video" autoplay muted playsinline></video>
-    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay muted></video>
+    <video id="remote-video" autoplay></video>
   </div>
 
   <div class="controls">
-    <button id="video-call-btn">📹</button>
-    <button id="audio-call-btn">🎤</button>
-    <button id="end-btn">❌</button>
-    <button id="mute-btn">🔇</button>
-    <button id="camera-btn">📷</button>
-    <button id="switch-cam-btn">🔄</button>
-    <button id="speaker-btn">🔊</button>
-    <button id="switch-mode-btn">🔁</button>
+    <button id="video-call-btn">📹 वीडियो कॉल</button>
+    <button id="audio-call-btn">🎤 ऑडियो कॉल</button>
+    <button id="end-btn">❌ कॉल समाप्त करें</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -68,17 +76,11 @@
     const videoCallBtn = document.getElementById('video-call-btn');
     const audioCallBtn = document.getElementById('audio-call-btn');
     const endBtn = document.getElementById('end-btn');
-    const muteBtn = document.getElementById('mute-btn');
-    const cameraBtn = document.getElementById('camera-btn');
-    const switchCamBtn = document.getElementById('switch-cam-btn');
-    const speakerBtn = document.getElementById('speaker-btn');
-    const switchModeBtn = document.getElementById('switch-mode-btn');
     const callStatus = document.getElementById('call-status');
 
     const socket = io();
-    let peerConnection, localStream;
-    let isMuted = false, isCameraOn = true, isSpeakerOn = false, isVideoMode = true;
-    let currentCam = "user"; // front cam
+    let peerConnection;
+    let localStream;
 
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
@@ -86,15 +88,10 @@
     audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
     endBtn.addEventListener('click', endCall);
 
-    muteBtn.addEventListener('click', toggleMute);
-    cameraBtn.addEventListener('click', toggleCamera);
-    switchCamBtn.addEventListener('click', switchCamera);
-    speakerBtn.addEventListener('click', toggleSpeaker);
-    switchModeBtn.addEventListener('click', switchMode);
-
     async function startCall(mediaConstraints) {
-      hideMainButtons();
-      showInCallButtons();
+      videoCallBtn.style.display = 'none';
+      audioCallBtn.style.display = 'none';
+      endBtn.style.display = 'inline-block';
       callStatus.innerText = "कॉल शुरू हो रही है...";
 
       try {
@@ -115,101 +112,112 @@
           if (event.candidate) socket.emit('ice-candidate', event.candidate);
         };
 
+        peerConnection.onconnectionstatechange = () => {
+          if (peerConnection.connectionState === "disconnected" || peerConnection.connectionState === "closed") {
+            callStatus.innerText = "❌ कॉल कट गई";
+            endCall();
+          }
+        };
+
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         socket.emit('offer', offer);
 
       } catch (error) {
-        alert("Mic/Camera की अनुमति दें!");
+        console.error('कॉल शुरू करने में त्रुटि:', error);
+        alert('कॉल शुरू नहीं हो सकी। कृपया अनुमति दें।');
         endCall();
       }
     }
 
-    function hideMainButtons() {
-      videoCallBtn.style.display = "none";
-      audioCallBtn.style.display = "none";
-    }
-
-    function showInCallButtons() {
-      endBtn.style.display = "inline-block";
-      muteBtn.style.display = "inline-block";
-      cameraBtn.style.display = "inline-block";
-      switchCamBtn.style.display = "inline-block";
-      speakerBtn.style.display = "inline-block";
-      switchModeBtn.style.display = "inline-block";
-    }
-
     async function endCall() {
-      if (peerConnection) peerConnection.close();
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      localVideo.srcObject = null;
+      remoteVideo.srcObject = null;
 
-      localStream = null; peerConnection = null;
-      localVideo.srcObject = null; remoteVideo.srcObject = null;
-
-      videoCallBtn.style.display = "inline-block";
-      audioCallBtn.style.display = "inline-block";
-
-      endBtn.style.display = "none";
-      muteBtn.style.display = "none";
-      cameraBtn.style.display = "none";
-      switchCamBtn.style.display = "none";
-      speakerBtn.style.display = "none";
-      switchModeBtn.style.display = "none";
+      videoCallBtn.style.display = 'inline-block';
+      audioCallBtn.style.display = 'inline-block';
+      endBtn.style.display = 'none';
 
       callStatus.innerText = "❌ कॉल समाप्त हुई";
+      socket.emit('call-ended');
     }
 
-    // 🎤 Mic mute/unmute
-    function toggleMute() {
-      if (!localStream) return;
-      isMuted = !isMuted;
-      localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-      muteBtn.innerText = isMuted ? "🎙️" : "🔇";
-    }
+    socket.on('offer', async (offer) => {
+      const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
+      if (isReady) {
+        videoCallBtn.style.display = 'none';
+        audioCallBtn.style.display = 'none';
+        endBtn.style.display = 'inline-block';
+        callStatus.innerText = "कॉल कनेक्ट हो रही है...";
 
-    // 📷 Camera on/off
-    function toggleCamera() {
-      if (!localStream) return;
-      isCameraOn = !isCameraOn;
-      localStream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
-      cameraBtn.innerText = isCameraOn ? "📷" : "🚫";
-    }
+        try {
+          const mediaConstraints = offer.sdp.includes('m=video') ? { video: true, audio: true } : { video: false, audio: true };
+          localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+          localVideo.srcObject = localStream;
+          
+          peerConnection = new RTCPeerConnection(servers);
+          localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // 🔄 Switch camera (front/back)
-    async function switchCamera() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-      currentCam = (currentCam === "user") ? "environment" : "user";
-      const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentCam }, audio: true });
-      replaceTracks(newStream);
-    }
+          peerConnection.ontrack = (event) => {
+            if (event.streams && event.streams[0]) {
+              remoteVideo.srcObject = event.streams[0];
+              callStatus.innerText = "📞 कॉल कनेक्टेड";
+            }
+          };
 
-    // 🔊 Speaker on/off
-    function toggleSpeaker() {
-      if (!remoteVideo) return;
-      isSpeakerOn = !isSpeakerOn;
-      remoteVideo.muted = !isSpeakerOn;
-      speakerBtn.innerText = isSpeakerOn ? "🔊" : "🔈";
-    }
+          peerConnection.onicecandidate = (event) => {
+            if (event.candidate) socket.emit('ice-candidate', event.candidate);
+          };
 
-    // 🔁 Switch between video & audio mode
-    function switchMode() {
-      isVideoMode = !isVideoMode;
-      if (isVideoMode) {
-        localStream.getVideoTracks().forEach(track => track.enabled = true);
-        switchModeBtn.innerText = "🔁";
+          peerConnection.onconnectionstatechange = () => {
+            if (peerConnection.connectionState === "disconnected" || peerConnection.connectionState === "closed") {
+              callStatus.innerText = "❌ कॉल कट गई";
+              endCall();
+            }
+          };
+
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          socket.emit('answer', answer);
+        } catch (error) {
+          console.error('कॉल का उत्तर देने में त्रुटि:', error);
+          endCall();
+        }
       } else {
-        localStream.getVideoTracks().forEach(track => track.enabled = false);
-        switchModeBtn.innerText = "🎤";
+        console.log('कॉल अस्वीकार की गई।');
+        callStatus.innerText = "कॉल अस्वीकार की गई";
       }
-    }
+    });
 
-    function replaceTracks(newStream) {
-      const videoTrack = newStream.getVideoTracks()[0];
-      const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-      if (sender) sender.replaceTrack(videoTrack);
-      localStream = newStream;
-      localVideo.srcObject = newStream;
-    }
+    socket.on('answer', async (answer) => {
+      if (peerConnection && !peerConnection.currentRemoteDescription) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    socket.on('ice-candidate', async (candidate) => {
+      if (peerConnection) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error('ICE Candidate जोड़ने में त्रुटि', e);
+        }
+      }
+    });
+
+    socket.on('call-ended', () => {
+      callStatus.innerText = "❌ कॉल दूसरी ओर से समाप्त हुई";
+      endCall();
+    });
   </script>
 </body>
 </html>
