@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>प्राइवेट कॉल</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .video-container { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
+        video { width: 45%; max-width: 600px; border: 2px solid #333; border-radius: 10px; background-color: #000; }
+        .controls { display: flex; justify-content: center; gap: 10px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; color: white; margin-top: 20px;}
+        #video-call-btn { background-color: #4CAF50; }
+        #audio-call-btn { background-color: #2196F3; }
+        #end-btn { background-color: #f44336; display: none; margin-top: 20px;}
+    </style>
+</head>
+<body>
+    <h1>वीडियो / ऑडियो कॉल</h1>
+    <div class="video-container">
+        <video id="local-video" autoplay muted></video>
+        <video id="remote-video" autoplay></video>
+    </div>
+    <div class="controls">
+        <button id="video-call-btn">वीडियो कॉल</button>
+        <button id="audio-call-btn">ऑडियो कॉल</button>
+        <button id="end-btn">कॉल समाप्त करें</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const videoCallBtn = document.getElementById('video-call-btn');
+        const audioCallBtn = document.getElementById('audio-call-btn');
+        const endBtn = document.getElementById('end-btn');
+
+        const socket = io();
+        let peerConnection;
+        let localStream;
+
+        const servers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+            ]
+        };
+
+        videoCallBtn.addEventListener('click', () => startCall({ video: true, audio: true }));
+        audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
+        endBtn.addEventListener('click', endCall);
+
+        async function startCall(mediaConstraints) {
+            videoCallBtn.style.display = 'none';
+            audioCallBtn.style.display = 'none';
+            endBtn.style.display = 'inline-block';
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                localVideo.srcObject = localStream;
+
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                peerConnection.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
+                };
+
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('ice-candidate', event.candidate);
+                    }
+                };
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                socket.emit('offer', offer);
+
+            } catch (error) {
+                console.error('कॉल शुरू करने में त्रुटि:', error);
+                alert('कॉल शुरू नहीं हो सकी। कृपया अपने कैमरे और माइक्रोफ़ोन की अनुमतियाँ जाँचें।');
+                endCall();
+            }
+        }
+
+        async function endCall() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+            videoCallBtn.style.display = 'inline-block';
+            audioCallBtn.style.display = 'inline-block';
+            endBtn.style.display = 'none';
+        }
+
+        socket.on('offer', async (offer) => {
+            const isReady = confirm('एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
+            if (isReady) {
+                videoCallBtn.style.display = 'none';
+                audioCallBtn.style.display = 'none';
+                endBtn.style.display = 'inline-block';
+
+                try {
+                    const mediaConstraints = offer.sdp.includes('m=video') ? { video: true, audio: true } : { video: false, audio: true };
+                    localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                    localVideo.srcObject = localStream;
+                    
+                    peerConnection = new RTCPeerConnection(servers);
+                    localStream.getTracks().forEach(track => {
+                        peerConnection.addTrack(track, localStream);
+                    });
+
+                    peerConnection.ontrack = (event) => {
+                        if (event.streams && event.streams[0]) {
+                            remoteVideo.srcObject = event.streams[0];
+                        }
+                    };
+
+                    peerConnection.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            socket.emit('ice-candidate', event.candidate);
+                        }
+                    };
+
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit('answer', answer);
+                } catch (error) {
+                    console.error('कॉल का उत्तर देने में त्रुटि:', error);
+                    endCall();
+                }
+            } else {
+                console.log('कॉल अस्वीकार की गई।');
+            }
+        });
+
+        socket.on('answer', async (answer) => {
+            if (peerConnection && !peerConnection.currentRemoteDescription) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            }
+        });
+
+        socket.on('ice-candidate', async (candidate) => {
+            if (peerConnection) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (e) {
+                    console.error('प्राप्त ICE उम्मीदवार जोड़ने में त्रुटि', e);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
