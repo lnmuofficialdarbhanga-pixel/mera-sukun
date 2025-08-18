@@ -49,6 +49,8 @@
     <button id="audio-call-btn">🎤 ऑडियो कॉल</button>
     <button id="end-btn">❌ कॉल समाप्त करें</button>
     <!-- Extra Controls -->
+    <button onclick="toggleFullScreen()">📺 Full Screen</button>
+
     <button id="mute-btn" class="extra">🔇 म्यूट</button>
     <button id="video-toggle-btn" class="extra">📷 बंद</button>
     <button id="camera-switch-btn" class="extra">🔄 कैमरा</button>
@@ -126,6 +128,21 @@
       remoteVideo.muted = !speakerOn;
       speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
     };
+
+    // ✅ FULL SCREEN (mobile browsers में limited support)
+function toggleFullScreen() {
+  let video = document.getElementById("remoteVideo");
+  if (!document.fullscreenElement) {
+    video.requestFullscreen().catch(err => {
+      alert(`Error: ${err.message}`);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+
+    
 
     async function startCall(mediaConstraints) {
       videoCallBtn.style.display = 'none';
