@@ -52,12 +52,21 @@
 <button id="audio-call-btn">
   <i class="fas fa-microphone"></i> ऑडियो कॉल
 </button>
-        <button id="end-btn">❌ कॉल समाप्त करें</button>
+        <button id="end-btn">कॉल समाप्त करें</button>
     <!-- Extra Controls -->
-    <button id="mute-btn" class="extra">🔇 म्यूट</button>
-    <button id="video-toggle-btn" class="extra">📷 बंद</button>
-    <button id="camera-switch-btn" class="extra">🔄 कैमरा</button>
-    <button id="speaker-btn" class="extra">🔊 स्पीकर</button>
+    <button id="mute-btn">
+        <i class="fas fa-microphone-slash"></i> म्यूट
+    </button>
+   <button id="camera-hide-btn">
+    <i class="fas fa-video-slash"></i> कैमरा हाइड
+</button>
+
+    <button id="camera-btn">
+    <i class="fas fa-video"></i> कैमरा
+</button>
+    <button id="speaker-btn">
+        <i class="fas fa-volume-up"></i> स्पीकर
+    </button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -94,7 +103,7 @@
       if (localStream) {
         isMuted = !isMuted;
         localStream.getAudioTracks()[0].enabled = !isMuted;
-        muteBtn.innerText = isMuted ? "🔈 अनम्यूट" : "🔇 म्यूट";
+        muteBtn.innerText = isMuted ? "अनम्यूट" : "म्यूट";
       }
     };
 
@@ -103,7 +112,7 @@
       if (localStream) {
         videoEnabled = !videoEnabled;
         localStream.getVideoTracks()[0].enabled = videoEnabled;
-        videoToggleBtn.innerText = videoEnabled ? "📷 बंद" : "📷 चालू";
+        videoToggleBtn.innerText = videoEnabled ? "बंद" : "चालू";
       }
     };
 
@@ -129,7 +138,7 @@
     speakerBtn.onclick = () => {
       speakerOn = !speakerOn;
       remoteVideo.muted = !speakerOn;
-      speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
+      speakerBtn.innerText = speakerOn ? "स्पीकर" : "इयरपीस";
     };
 
     async function startCall(mediaConstraints) {
@@ -149,7 +158,7 @@
         peerConnection.ontrack = (event) => {
           if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
-            callStatus.innerText = "📞 कॉल कनेक्टेड";
+            callStatus.innerText = "कॉल कनेक्टेड";
           }
         };
 
@@ -159,7 +168,7 @@
 
         peerConnection.onconnectionstatechange = () => {
           if (["disconnected","closed","failed"].includes(peerConnection.connectionState)) {
-            callStatus.innerText = "❌ कॉल कट गई";
+            callStatus.innerText = "कॉल कट गई";
             endCall();
           }
         };
@@ -198,7 +207,7 @@
 
     // ✅ Incoming offer
     socket.on('offer', async (offer) => {
-      const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
+      const isReady = confirm('एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
       if (isReady) {
         videoCallBtn.style.display = 'none';
         audioCallBtn.style.display = 'none';
@@ -217,7 +226,7 @@
           peerConnection.ontrack = (event) => {
             if (event.streams && event.streams[0]) {
               remoteVideo.srcObject = event.streams[0];
-              callStatus.innerText = "📞 कॉल कनेक्टेड";
+              callStatus.innerText = "कॉल कनेक्टेड";
             }
           };
 
@@ -227,7 +236,7 @@
 
           peerConnection.onconnectionstatechange = () => {
             if (["disconnected","closed","failed"].includes(peerConnection.connectionState)) {
-              callStatus.innerText = "❌ कॉल कट गई";
+              callStatus.innerText = "कॉल कट गई";
               endCall();
             }
           };
@@ -262,7 +271,7 @@
     });
 
     socket.on('call-ended', () => {
-      callStatus.innerText = "❌ कॉल दूसरी ओर से समाप्त हुई";
+      callStatus.innerText = "कॉल दूसरी ओर से समाप्त हुई";
       endCall();
     });
   </script>
