@@ -2,7 +2,6 @@
 <html lang="hi">
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>प्राइवेट कॉल</title>
   <style>
@@ -17,9 +16,9 @@
     .status { font-size: 18px; margin-bottom: 20px; font-weight: bold; }
     .video-container { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
     video {
-      width: 50%; max-width: 500px;
-      border-radius: 5px;
-      border: 1px solid rgba(255,255,255,0.3);
+      width: 45%; max-width: 500px;
+      border-radius: 15px;
+      border: 3px solid rgba(255,255,255,0.3);
       box-shadow: 0 8px 20px rgba(0,0,0,0.3);
       background: black;
     }
@@ -49,24 +48,15 @@
     <button id="video-call-btn">
   <i class="fas fa-video"></i> वीडियो कॉल
 </button>
-<button id="audio-call-btn">
+    <button id="audio-call-btn">
   <i class="fas fa-microphone"></i> ऑडियो कॉल
 </button>
-        <button id="end-btn">कॉल समाप्त करें</button>
+    <button id="end-btn">कॉल समाप्त करें</button>
     <!-- Extra Controls -->
-    <button id="mute-btn">
-        <i class="fas fa-microphone-slash"></i> म्यूट
-    </button>
-   <button id="camera-hide-btn">
-    <i class="fas fa-video-slash"></i> कैमरा हाइड
-</button>
-
-    <button id="camera-btn">
-    <i class="fas fa-video"></i> कैमरा
-</button>
-    <button id="speaker-btn">
-        <i class="fas fa-volume-up"></i> स्पीकर
-    </button>
+    <button id="mute-btn" class="extra">🔇 म्यूट</button>
+    <button id="video-toggle-btn" class="extra">📷 बंद</button>
+    <button id="camera-switch-btn" class="extra">🔄 कैमरा</button>
+    <button id="speaker-btn" class="extra">🔊 स्पीकर</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -103,7 +93,7 @@
       if (localStream) {
         isMuted = !isMuted;
         localStream.getAudioTracks()[0].enabled = !isMuted;
-        muteBtn.innerText = isMuted ? "अनम्यूट" : "म्यूट";
+        muteBtn.innerText = isMuted ? "🔈 अनम्यूट" : "🔇 म्यूट";
       }
     };
 
@@ -112,7 +102,7 @@
       if (localStream) {
         videoEnabled = !videoEnabled;
         localStream.getVideoTracks()[0].enabled = videoEnabled;
-        videoToggleBtn.innerText = videoEnabled ? "बंद" : "चालू";
+        videoToggleBtn.innerText = videoEnabled ? "📷 बंद" : "📷 चालू";
       }
     };
 
@@ -138,7 +128,7 @@
     speakerBtn.onclick = () => {
       speakerOn = !speakerOn;
       remoteVideo.muted = !speakerOn;
-      speakerBtn.innerText = speakerOn ? "स्पीकर" : "इयरपीस";
+      speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
     };
 
     async function startCall(mediaConstraints) {
@@ -158,7 +148,7 @@
         peerConnection.ontrack = (event) => {
           if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
-            callStatus.innerText = "कॉल कनेक्टेड";
+            callStatus.innerText = "📞 कॉल कनेक्टेड";
           }
         };
 
@@ -201,13 +191,13 @@
       endBtn.style.display = 'none';
       muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "none";
 
-      callStatus.innerText = "❌ कॉल समाप्त हुई";
+      callStatus.innerText = "कॉल समाप्त हुई";
       socket.emit('call-ended');
     }
 
     // ✅ Incoming offer
     socket.on('offer', async (offer) => {
-      const isReady = confirm('एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
+      const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
       if (isReady) {
         videoCallBtn.style.display = 'none';
         audioCallBtn.style.display = 'none';
@@ -226,7 +216,7 @@
           peerConnection.ontrack = (event) => {
             if (event.streams && event.streams[0]) {
               remoteVideo.srcObject = event.streams[0];
-              callStatus.innerText = "कॉल कनेक्टेड";
+              callStatus.innerText = "📞 कॉल कनेक्टेड";
             }
           };
 
