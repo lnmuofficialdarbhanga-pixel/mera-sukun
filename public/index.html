@@ -74,11 +74,11 @@
     </style>
 </head>
 <body>
-    <h1>🔒 प्राइवेट कॉल</h1>
+ 
     <div id="login-section">
         <button id="login-btn"><i class="fab fa-google"></i> Google से लॉगिन</button>
         <div id="user-info"></div>
-        <button id="logout-btn">🚪 लॉगआउट</button>
+        <button id="logout-btn">लॉगआउट</button>
     </div>
 
     <div class="status" id="call-status">कोई कॉल शुरू नहीं है</div>
@@ -202,7 +202,7 @@
                 // जांच करें कि क्या वह एक अनुमत उपयोगकर्ता है
                 if (allowedUsers[user.email] && isUnlocked) {
                     currentUserEmail = user.email;
-                    userInfo.innerHTML = "✔ लॉगिन: " + user.email;
+                    userInfo.innerHTML = "लॉगिन: " + user.email;
                     loginBtn.style.display = "none";
                     logoutBtn.style.display = "inline-block";
                     controls.style.display = "flex";
