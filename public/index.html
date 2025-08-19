@@ -43,11 +43,12 @@
     #lock-screen {
       position: fixed;
       top:0; left:0; right:0; bottom:0;
-      background: rgba(0,0,0,0.9);
-      display: flex; flex-direction: column;
+      background: rgba(0,0,0,0.94);
+      display: none; flex-direction: column;
       justify-content: center; align-items: center;
       z-index: 9999;
       color: white;
+      padding: 20px;
     }
     #lock-screen input {
       padding: 10px;
@@ -56,6 +57,7 @@
       font-size: 16px;
       text-align: center;
       margin-bottom: 10px;
+      width: 220px;
     }
     #unlock-btn {
       background: #4caf50; color:white;
@@ -63,10 +65,16 @@
       border:none; border-radius:5px;
       cursor:pointer; font-weight:bold;
     }
+
+    /* small responsive */
+    @media (max-width:700px) {
+      .video-container { flex-direction: column; }
+      video { width: 90%; }
+    }
   </style>
 </head>
 <body>
-  <h1></h1>
+  <h1>🔒 प्राइवेट कॉल</h1>
   <div id="login-section">
     <button id="login-btn"><i class="fab fa-google"></i> Google से लॉगिन</button>
     <div id="user-info"></div>
@@ -92,7 +100,7 @@
   </div>
 
   <!-- 🔒 Lock Screen -->
-  <div id="lock-screen" style="display:flex;">
+  <div id="lock-screen">
     <h2>🔒 पेज लॉक है</h2>
     <input type="password" id="lock-password" placeholder="पासवर्ड दर्ज करें">
     <button id="unlock-btn">Unlock</button>
@@ -114,6 +122,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
+    // Allowed users (only these two)
     const allowedUsers = {
       "kumarikiransah2001@gmail.com": true,
       "prakashkumarraushan1@gmail.com": true
@@ -124,25 +133,56 @@
     const userInfo = document.getElementById("user-info");
     const controls = document.querySelector(".controls");
 
+    // variables for current session
+    let currentUserEmail = null;
+    let targetEmail = null;
+
     loginBtn.onclick = () => {
       const provider = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(provider).catch(err => alert(err.message));
     };
 
-    logoutBtn.onclick = () => auth.signOut();
+    logoutBtn.onclick = () => {
+      // notify server about unregister (done later in socket)
+      if (currentUserEmail) {
+        try { socket.emit('unregister', currentUserEmail); } catch(e){ }
+      }
+      auth.signOut();
+    };
+
+    // socket is defined later; we declare variable for use in auth callback
+    let socket;
 
     auth.onAuthStateChanged(user => {
       if (user && allowedUsers[user.email]) {
+        currentUserEmail = user.email;
         userInfo.innerHTML = "✔ लॉगिन: " + user.email;
         loginBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
         controls.style.display = "flex";
+
+        // decide target (the other allowed one)
+        if (user.email === "kumarikiransah2001@gmail.com") {
+          targetEmail = "prakashkumarraushan1@gmail.com";
+        } else {
+          targetEmail = "kumarikiransah2001@gmail.com";
+        }
+
+        // connect socket (if not already)
+        if (!socket) initSocket();
+
+        // register this user with server
+        socket.emit('register', currentUserEmail);
+
       } else {
+        // not allowed or logged out
+        currentUserEmail = null;
+        targetEmail = null;
         userInfo.innerHTML = "";
         loginBtn.style.display = "inline-block";
         logoutBtn.style.display = "none";
         controls.style.display = "none";
-        if (user) { 
+        if (user) {
           alert("❌ यह Gmail अलाउड नहीं है!");
           auth.signOut();
         }
@@ -165,158 +205,94 @@
     const cameraSwitchBtn = document.getElementById('camera-switch-btn');
     const speakerBtn = document.getElementById('speaker-btn');
 
-    const socket = io();
+    // lock screen elements
+    const lockScreen = document.getElementById('lock-screen');
+    const unlockBtn = document.getElementById('unlock-btn');
+    const lockPassInput = document.getElementById('lock-password');
+    const LOCK_PASSWORD = "8003";
+
+    // state
     let peerConnection;
     let localStream;
     let isMuted = false;
     let videoEnabled = true;
     let usingFront = true;
     let speakerOn = false;
-
-    let callTimer; // 🔒 टाइमर
+    let callTimer; // 30s timer
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-    function lockPage() {
-      document.getElementById("lock-screen").style.display = "flex";
+    // targeted signaling helpers
+    let currentUserEmail = null; // set by firebase auth earlier
+    let targetEmail = null;      // set by firebase auth earlier
+    let remoteSocketId = null;   // set when an offer/answer arrives (socket id of other peer)
+
+    function showLock() {
+      lockScreen.style.display = 'flex';
     }
-    function unlockPage() {
-      document.getElementById("lock-screen").style.display = "none";
+    function hideLock() {
+      lockScreen.style.display = 'none';
+      lockPassInput.value = '';
     }
 
-    document.getElementById("unlock-btn").onclick = () => {
-      const pass = document.getElementById("lock-password").value;
-      if (pass === "8003") {
-        unlockPage();
+    // initial page locked until user unlocks
+    showLock();
+
+    unlockBtn.onclick = () => {
+      const pass = lockPassInput.value;
+      if (pass === LOCK_PASSWORD) {
+        hideLock();
       } else {
-        alert("❌ गलत पासवर्ड!");
+        alert('❌ गलत पासवर्ड!');
       }
     };
 
-    // 🔒 Tab change / minimize / offline पर lock
+    // lock on visibility change (new tab, minimize)
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) lockPage();
+      if (document.hidden) showLock();
     });
-    window.addEventListener("offline", lockPage);
+    // lock on offline
+    window.addEventListener("offline", showLock);
 
-    videoCallBtn.addEventListener('click', () => startCall({ video: true, audio: true }));
-    audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
-    endBtn.addEventListener('click', endCall);
+    // Initialize socket & handlers (called after login)
+    function initSocket() {
+      socket = io();
 
-    muteBtn.onclick = () => {
-      if (localStream) {
-        isMuted = !isMuted;
-        localStream.getAudioTracks()[0].enabled = !isMuted;
-        muteBtn.innerText = isMuted ? "🔈 अनम्यूट" : "🔇 म्यूट";
-      }
-    };
-
-    videoToggleBtn.onclick = () => {
-      if (localStream) {
-        videoEnabled = !videoEnabled;
-        localStream.getVideoTracks()[0].enabled = videoEnabled;
-        videoToggleBtn.innerText = videoEnabled ? "📷 बंद" : "📷 चालू";
-      }
-    };
-
-    cameraSwitchBtn.onclick = async () => {
-      if (!localStream) return;
-      usingFront = !usingFront;
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: usingFront ? "user" : "environment" },
-        audio: true
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-      sender.replaceTrack(newVideoTrack);
-      localStream.getTracks().forEach(track => track.stop());
-      localStream = newStream;
-      localVideo.srcObject = localStream;
-    };
-
-    speakerBtn.onclick = () => {
-      speakerOn = !speakerOn;
-      remoteVideo.muted = !speakerOn;
-      speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
-    };
-
-    async function startCall(mediaConstraints) {
-      videoCallBtn.style.display = 'none';
-      audioCallBtn.style.display = 'none';
-      endBtn.style.display = 'inline-block';
-      muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "inline-block";
-      callStatus.innerText = "कॉल शुरू हो रही है...";
-
-      // 🔒 30 सेकंड में connect न हुआ तो lock
-      clearTimeout(callTimer);
-      callTimer = setTimeout(() => {
-        if (!remoteVideo.srcObject) {
-          endCall();
-          lockPage();
+      socket.on('connect', () => {
+        console.log('Socket connected', socket.id);
+        // if already logged in register again
+        if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+          const u = firebase.auth().currentUser;
+          if (u && u.email) {
+            currentUserEmail = u.email;
+            socket.emit('register', currentUserEmail);
+          }
         }
-      }, 30000);
+      });
 
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-        localVideo.srcObject = localStream;
-
-        peerConnection = new RTCPeerConnection(servers);
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = (event) => {
-          if (event.streams && event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
-            callStatus.innerText = "📞 कॉल कनेक्टेड";
-            clearTimeout(callTimer); // कॉल connect होते ही टाइमर बंद
-          }
-        };
-
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) socket.emit('ice-candidate', event.candidate);
-        };
-
-        peerConnection.onconnectionstatechange = () => {
-          if (["disconnected","closed","failed"].includes(peerConnection.connectionState)) {
-            callStatus.innerText = "कॉल कट गई";
-            endCall();
-          }
-        };
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('offer', offer);
-
-      } catch (error) {
-        console.error('कॉल शुरू करने में त्रुटि:', error);
-        alert('कॉल शुरू नहीं हो सकी। कृपया अनुमति दें।');
+      socket.on('user-unavailable', (data) => {
+        alert(data.message || 'User not available');
+        // end call UI cleanup if needed
         endCall();
-      }
-    }
+      });
 
-    async function endCall() {
-      clearTimeout(callTimer);
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-      }
-      localVideo.srcObject = null;
-      remoteVideo.srcObject = null;
+      // Offer received (from targeted caller)
+      socket.on('offer', async ({ offer, from, fromEmail }) => {
+        // if not logged or not allowed -> ignore
+        const u = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
+        if (!u || !u.email || !(['kumarikiransah2001@gmail.com','prakashkumarraushan1@gmail.com'].includes(u.email))) {
+          console.log('Offer received but user not authorized. Ignoring.');
+          return;
+        }
 
-      videoCallBtn.style.display = 'inline-block';
-      audioCallBtn.style.display = 'inline-block';
-      endBtn.style.display = 'none';
-      muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "none";
+        // store who called (socket id) so we can reply
+        remoteSocketId = from;
 
-      callStatus.innerText = "कॉल समाप्त हुई";
-      socket.emit('call-ended');
-    }
+        const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
+        if (!isReady) {
+          callStatus.innerText = "कॉल अस्वीकार की गई";
+          return;
+        }
 
-    socket.on('offer', async (offer) => {
-      const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
-      if (isReady) {
         clearTimeout(callTimer);
         videoCallBtn.style.display = 'none';
         audioCallBtn.style.display = 'none';
@@ -325,7 +301,7 @@
         callStatus.innerText = "कॉल कनेक्ट हो रही है...";
 
         try {
-          const mediaConstraints = offer.sdp.includes('m=video') ? { video: true, audio: true } : { video: false, audio: true };
+          const mediaConstraints = offer.sdp && offer.sdp.includes('m=video') ? { video: true, audio: true } : { video: false, audio: true };
           localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
           localVideo.srcObject = localStream;
 
@@ -341,7 +317,10 @@
           };
 
           peerConnection.onicecandidate = (event) => {
-            if (event.candidate) socket.emit('ice-candidate', event.candidate);
+            if (event.candidate) {
+              // send candidate to caller using its socket id
+              socket.emit('ice-candidate', { candidate: event.candidate, targetId: remoteSocketId });
+            }
           };
 
           peerConnection.onconnectionstatechange = () => {
@@ -354,35 +333,209 @@
           await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
-          socket.emit('answer', answer);
+
+          // send answer to caller (targetId = caller socket id)
+          socket.emit('answer', { answer, targetId: remoteSocketId });
+
         } catch (error) {
           console.error('कॉल का उत्तर देने में त्रुटि:', error);
           endCall();
         }
-      } else {
-        callStatus.innerText = "कॉल अस्वीकार की गई";
-      }
-    });
+      });
 
-    socket.on('answer', async (answer) => {
-      if (peerConnection && !peerConnection.currentRemoteDescription) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      }
-    });
-
-    socket.on('ice-candidate', async (candidate) => {
-      if (peerConnection) {
-        try {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.error('ICE Candidate जोड़ने में त्रुटि', e);
+      // Answer received (from callee)
+      socket.on('answer', async ({ answer, from }) => {
+        if (peerConnection && !peerConnection.currentRemoteDescription) {
+          try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            // now we know remote socket id (callee)
+            remoteSocketId = from;
+          } catch (e) {
+            console.error('Answer set error', e);
+          }
         }
+      });
+
+      // ICE candidate received
+      socket.on('ice-candidate', async ({ candidate, from }) => {
+        if (peerConnection) {
+          try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('ICE Candidate जोड़ने में त्रुटि', e);
+          }
+        }
+      });
+
+      // call ended by remote
+      socket.on('call-ended', () => {
+        callStatus.innerText = "कॉल दूसरी ओर से समाप्त हुई";
+        endCall();
+      });
+    }
+
+    // core UI actions
+    videoCallBtn.addEventListener('click', () => startCall({ video: true, audio: true }));
+    audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
+    endBtn.addEventListener('click', () => {
+      // notify remote if known
+      if (remoteSocketId) {
+        socket.emit('call-ended', { targetId: remoteSocketId });
+      } else if (targetEmail) {
+        socket.emit('call-ended', { targetEmail });
+      } else {
+        socket.emit('call-ended', {});
       }
+      endCall();
     });
 
-    socket.on('call-ended', () => {
-      callStatus.innerText = "कॉल दूसरी ओर से समाप्त हुई";
-      endCall();
+    muteBtn.onclick = () => {
+      if (localStream) {
+        isMuted = !isMuted;
+        localStream.getAudioTracks()[0].enabled = !isMuted;
+        muteBtn.innerText = isMuted ? "🔈 अनम्यूट" : "🔇 म्यूट";
+      }
+    };
+
+    videoToggleBtn.onclick = () => {
+      if (localStream && localStream.getVideoTracks().length) {
+        videoEnabled = !videoEnabled;
+        localStream.getVideoTracks()[0].enabled = videoEnabled;
+        videoToggleBtn.innerText = videoEnabled ? "📷 बंद" : "📷 चालू";
+      }
+    };
+
+    cameraSwitchBtn.onclick = async () => {
+      if (!localStream) return;
+      usingFront = !usingFront;
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: usingFront ? "user" : "environment" },
+        audio: true
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
+      if (sender) sender.replaceTrack(newVideoTrack);
+
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = newStream;
+      localVideo.srcObject = localStream;
+    };
+
+    speakerBtn.onclick = () => {
+      speakerOn = !speakerOn;
+      remoteVideo.muted = !speakerOn;
+      speakerBtn.innerText = speakerOn ? "🔊 स्पीकर" : "🔈 इयरपीस";
+    };
+
+    async function startCall(mediaConstraints) {
+      // only allow when logged in and targetEmail known
+      const user = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
+      if (!user || !(['kumarikiransah2001@gmail.com','prakashkumarraushan1@gmail.com'].includes(user))) {
+        alert('कृपया पहले लॉगिन करें और सही उपयोगकर्ता हों।');
+        return;
+      }
+
+      videoCallBtn.style.display = 'none';
+      audioCallBtn.style.display = 'none';
+      endBtn.style.display = 'inline-block';
+      muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "inline-block";
+      callStatus.innerText = "कॉल शुरू हो रही है...";
+
+      // start 30s timer -> if remote not connected then lock
+      clearTimeout(callTimer);
+      callTimer = setTimeout(() => {
+        // अगर अभी तक remote video नहीं आई है तो lock
+        if (!remoteVideo.srcObject) {
+          endCall();
+          showLock();
+        }
+      }, 30000);
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        localVideo.srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection(servers);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+          if (event.streams && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            callStatus.innerText = "📞 कॉल कनेक्टेड";
+            clearTimeout(callTimer);
+          }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            // try to send candidate: if remoteSocketId known use it, else send using targetEmail
+            if (remoteSocketId) {
+              socket.emit('ice-candidate', { candidate: event.candidate, targetId: remoteSocketId });
+            } else {
+              socket.emit('ice-candidate', { candidate: event.candidate, targetEmail: targetEmail });
+            }
+          }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+          if (["disconnected","closed","failed"].includes(peerConnection.connectionState)) {
+            callStatus.innerText = "कॉल कट गई";
+            endCall();
+          }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        // send offer to targetEmail (server will forward only to registered socket)
+        socket.emit('offer', { offer, targetEmail });
+
+      } catch (error) {
+        console.error('कॉल शुरू करने में त्रुटि:', error);
+        alert('कॉल शुरू नहीं हो सकी। कृपया अनुमति दें।');
+        endCall();
+      }
+    }
+
+    async function endCall() {
+      clearTimeout(callTimer);
+      if (peerConnection) {
+        try { peerConnection.close(); } catch(e){ }
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      localVideo.srcObject = null;
+      remoteVideo.srcObject = null;
+
+      videoCallBtn.style.display = 'inline-block';
+      audioCallBtn.style.display = 'inline-block';
+      endBtn.style.display = 'none';
+      muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "none";
+
+      callStatus.innerText = "कॉल समाप्त हुई";
+
+      // notify remote
+      if (remoteSocketId) {
+        socket.emit('call-ended', { targetId: remoteSocketId });
+      } else if (targetEmail) {
+        socket.emit('call-ended', { targetEmail });
+      } else {
+        socket.emit('call-ended', {});
+      }
+
+      remoteSocketId = null;
+    }
+
+    // unload cleanup
+    window.addEventListener('beforeunload', () => {
+      try {
+        if (firebase && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.email) {
+          socket.emit('unregister', firebase.auth().currentUser.email);
+        }
+      } catch(e){}
     });
   </script>
 </body>
