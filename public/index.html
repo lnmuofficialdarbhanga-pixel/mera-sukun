@@ -38,6 +38,31 @@
     #login-btn { background: #ff9800; color: white; }
     #logout-btn { background: #e91e63; color: white; display: none; margin-top: 15px; }
     #user-info { margin-top: 15px; font-size: 16px; font-weight: bold; }
+
+    /* 🔒 Lock Screen */
+    #lock-screen {
+      position: fixed;
+      top:0; left:0; right:0; bottom:0;
+      background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      z-index: 9999;
+      color: white;
+    }
+    #lock-screen input {
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      font-size: 16px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    #unlock-btn {
+      background: #4caf50; color:white;
+      padding: 8px 20px;
+      border:none; border-radius:5px;
+      cursor:pointer; font-weight:bold;
+    }
   </style>
 </head>
 <body>
@@ -64,6 +89,13 @@
     <button id="video-toggle-btn" class="extra">📷 बंद</button>
     <button id="camera-switch-btn" class="extra">🔄 कैमरा</button>
     <button id="speaker-btn" class="extra">🔊 स्पीकर</button>
+  </div>
+
+  <!-- 🔒 Lock Screen -->
+  <div id="lock-screen" style="display:flex;">
+    <h2>🔒 पेज लॉक है</h2>
+    <input type="password" id="lock-password" placeholder="पासवर्ड दर्ज करें">
+    <button id="unlock-btn">Unlock</button>
   </div>
 
   <!-- Firebase SDK -->
@@ -104,7 +136,7 @@
         userInfo.innerHTML = "✔ लॉगिन: " + user.email;
         loginBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
-        controls.style.display = "flex"; // कॉल बटन दिखें
+        controls.style.display = "flex";
       } else {
         userInfo.innerHTML = "";
         loginBtn.style.display = "inline-block";
@@ -141,7 +173,30 @@
     let usingFront = true;
     let speakerOn = false;
 
+    let callTimer; // 🔒 टाइमर
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    function lockPage() {
+      document.getElementById("lock-screen").style.display = "flex";
+    }
+    function unlockPage() {
+      document.getElementById("lock-screen").style.display = "none";
+    }
+
+    document.getElementById("unlock-btn").onclick = () => {
+      const pass = document.getElementById("lock-password").value;
+      if (pass === "8003") {
+        unlockPage();
+      } else {
+        alert("❌ गलत पासवर्ड!");
+      }
+    };
+
+    // 🔒 Tab change / minimize / offline पर lock
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) lockPage();
+    });
+    window.addEventListener("offline", lockPage);
 
     videoCallBtn.addEventListener('click', () => startCall({ video: true, audio: true }));
     audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
@@ -191,6 +246,15 @@
       muteBtn.style.display = videoToggleBtn.style.display = cameraSwitchBtn.style.display = speakerBtn.style.display = "inline-block";
       callStatus.innerText = "कॉल शुरू हो रही है...";
 
+      // 🔒 30 सेकंड में connect न हुआ तो lock
+      clearTimeout(callTimer);
+      callTimer = setTimeout(() => {
+        if (!remoteVideo.srcObject) {
+          endCall();
+          lockPage();
+        }
+      }, 30000);
+
       try {
         localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
         localVideo.srcObject = localStream;
@@ -202,6 +266,7 @@
           if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             callStatus.innerText = "📞 कॉल कनेक्टेड";
+            clearTimeout(callTimer); // कॉल connect होते ही टाइमर बंद
           }
         };
 
@@ -228,6 +293,7 @@
     }
 
     async function endCall() {
+      clearTimeout(callTimer);
       if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
@@ -251,6 +317,7 @@
     socket.on('offer', async (offer) => {
       const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
       if (isReady) {
+        clearTimeout(callTimer);
         videoCallBtn.style.display = 'none';
         audioCallBtn.style.display = 'none';
         endBtn.style.display = 'inline-block';
@@ -269,6 +336,7 @@
             if (event.streams && event.streams[0]) {
               remoteVideo.srcObject = event.streams[0];
               callStatus.innerText = "📞 कॉल कनेक्टेड";
+              clearTimeout(callTimer);
             }
           };
 
