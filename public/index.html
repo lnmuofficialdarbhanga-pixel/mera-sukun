@@ -74,11 +74,11 @@
     </style>
 </head>
 <body>
-    
+    <h1>🔒 प्राइवेट कॉल</h1>
     <div id="login-section">
         <button id="login-btn"><i class="fab fa-google"></i> Google से लॉगिन</button>
         <div id="user-info"></div>
-        <button id="logout-btn">लॉगआउट</button>
+        <button id="logout-btn">🚪 लॉगआउट</button>
     </div>
 
     <div class="status" id="call-status">कोई कॉल शुरू नहीं है</div>
@@ -99,9 +99,9 @@
     </div>
 
     <div id="lock-screen">
-        
-        <input type="password" id="lock-password" placeholder="">
-        <button id="unlock-btn">.................................</button>
+        <h2>🔒 पेज लॉक है</h2>
+        <input type="password" id="lock-password" placeholder="पासवर्ड दर्ज करें">
+        <button id="unlock-btn">Unlock</button>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -144,7 +144,6 @@
         const lockPassInput = document.getElementById('lock-password');
         const LOCK_PASSWORD = "8003";
 
-        // variables for current session
         let currentUserEmail = null;
         let targetEmail = null;
         let peerConnection;
@@ -157,19 +156,18 @@
         let socket;
         let remoteSocketId = null;
         const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-        // यह वेरिएबल अब सिर्फ एक बार है
         let isUnlocked = false;
 
         function showLock() {
             lockScreen.style.display = 'flex';
         }
+
         function hideLock() {
             lockScreen.style.display = 'none';
             lockPassInput.value = '';
         }
 
-        window.onload = showLock; // पेज लोड होते ही लॉक स्क्रीन दिखाओ
+        window.onload = showLock;
 
         unlockBtn.onclick = () => {
             const pass = lockPassInput.value;
@@ -213,7 +211,6 @@
 
                 if (!socket) initSocket();
                 socket.emit('register', currentUserEmail);
-
             } else {
                 currentUserEmail = null;
                 targetEmail = null;
@@ -222,14 +219,15 @@
                 logoutBtn.style.display = "none";
                 controls.style.display = "none";
 
-                if (user && !allowedUsers[user.email]) {
-                    alert("❌ यह Gmail अलाउड नहीं है!");
-                    auth.signOut();
+                // यह बदलाव किया गया है: अब सिर्फ़ तभी लॉक लगाएँ जब `user` ऑब्जेक्ट null हो, 
+                // इसका मतलब है कि कोई भी उपयोगकर्ता लॉगइन नहीं है
+                if (!user) {
                     isUnlocked = false;
                     showLock();
-                }
-                
-                if (!user) {
+                } else if (!allowedUsers[user.email]) {
+                    // अगर उपयोगकर्ता लॉगइन है लेकिन अलाउड नहीं है
+                    alert("❌ यह Gmail अलाउड नहीं है!");
+                    auth.signOut();
                     isUnlocked = false;
                     showLock();
                 }
@@ -291,7 +289,11 @@
                     };
                     peerConnection.onicecandidate = (event) => {
                         if (event.candidate) {
-                            socket.emit('ice-candidate', { candidate: event.candidate, targetId: remoteSocketId });
+                            if (remoteSocketId) {
+                                socket.emit('ice-candidate', { candidate: event.candidate, targetId: remoteSocketId });
+                            } else {
+                                socket.emit('ice-candidate', { candidate: event.candidate, targetEmail: targetEmail });
+                            }
                         }
                     };
                     peerConnection.onconnectionstatechange = () => {
