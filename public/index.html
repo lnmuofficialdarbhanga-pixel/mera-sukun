@@ -16,13 +16,22 @@
         h1 { margin-bottom: 10px; }
         .status { font-size: 18px; margin-bottom: 20px; font-weight: bold; }
         .video-container { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
-        video {
-            width: 45%; max-width: 500px;
-            border-radius: 5px;
-            border: 1px solid rgba(255,255,255,0.3);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-            background: black;
-        }
+      .video-container {
+    display: flex; 
+    justify-content: center; /* वीडियो को हॉरिजॉन्टली बीच में लाएगा */
+    align-items: center; /* अगर वर्टिकली बीच में लाना हो तो */
+    gap: 20px; 
+    margin-bottom: 20px;
+}
+
+video {
+    width: 45%; 
+    max-width: 500px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.3);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    background: black;
+}
         .controls { display: none; flex-wrap: wrap; justify-content: center; gap: 10px; }
         button {
             padding: 12px 20px; font-size: 15px; border: none;
@@ -99,7 +108,7 @@
     </div>
 
     <div id="lock-screen">
-        <h2>🔒 पेज लॉक है</h2>
+        
         <input type="password" id="lock-password" placeholder="पासवर्ड दर्ज करें">
         <button id="unlock-btn">Unlock</button>
     </div>
