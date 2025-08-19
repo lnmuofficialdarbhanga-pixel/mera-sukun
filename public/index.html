@@ -23,7 +23,7 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.3);
       background: black;
     }
-    .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    .controls { display: none; flex-wrap: wrap; justify-content: center; gap: 10px; }
     button {
       padding: 12px 20px; font-size: 15px; border: none;
       border-radius: 25px; cursor: pointer; transition: 0.3s;
@@ -34,10 +34,20 @@
     #audio-call-btn { background: #2196F3; color: white; }
     #end-btn { background: #f44336; color: white; display: none; }
     .extra { background: #333; color: white; display: none; }
+    #login-section { margin-top: 50px; }
+    #login-btn { background: #ff9800; color: white; }
+    #logout-btn { background: #e91e63; color: white; display: none; margin-top: 15px; }
+    #user-info { margin-top: 15px; font-size: 16px; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1></h1>
+  <div id="login-section">
+    <button id="login-btn"><i class="fab fa-google"></i> Google से लॉगिन</button>
+    <div id="user-info"></div>
+    <button id="logout-btn">🚪 लॉगआउट</button>
+  </div>
+
   <div class="status" id="call-status">कोई कॉल शुरू नहीं है</div>
 
   <div class="video-container">
@@ -46,12 +56,8 @@
   </div>
 
   <div class="controls">
-    <button id="video-call-btn">
-  <i class="fas fa-video"></i> वीडियो कॉल
-</button>
-    <button id="audio-call-btn">
-  <i class="fas fa-microphone"></i> ऑडियो कॉल
-</button>
+    <button id="video-call-btn"><i class="fas fa-video"></i> वीडियो कॉल</button>
+    <button id="audio-call-btn"><i class="fas fa-microphone"></i> ऑडियो कॉल</button>
     <button id="end-btn">कॉल समाप्त करें</button>
     <!-- Extra Controls -->
     <button id="mute-btn" class="extra">🔇 म्यूट</button>
@@ -60,6 +66,59 @@
     <button id="speaker-btn" class="extra">🔊 स्पीकर</button>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCacx1JD4PoNCwLvyQBvzY2SisKMTAs7Yo",
+      authDomain: "mera-sukun.firebaseapp.com",
+      databaseURL: "https://mera-sukun-default-rtdb.firebaseio.com",
+      projectId: "mera-sukun",
+      storageBucket: "mera-sukun.firebasestorage.app",
+      messagingSenderId: "900921074457",
+      appId: "1:900921074457:web:41af1ae2c3b1f09631db88"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    const allowedUsers = {
+      "kumarikiransah2001@gmail.com": true,
+      "prakashkumarraushan1@gmail.com": true
+    };
+
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const userInfo = document.getElementById("user-info");
+    const controls = document.querySelector(".controls");
+
+    loginBtn.onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(err => alert(err.message));
+    };
+
+    logoutBtn.onclick = () => auth.signOut();
+
+    auth.onAuthStateChanged(user => {
+      if (user && allowedUsers[user.email]) {
+        userInfo.innerHTML = "✔ लॉगिन: " + user.email;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        controls.style.display = "flex"; // कॉल बटन दिखें
+      } else {
+        userInfo.innerHTML = "";
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+        controls.style.display = "none";
+        if (user) { 
+          alert("❌ यह Gmail अलाउड नहीं है!");
+          auth.signOut();
+        }
+      }
+    });
+  </script>
+
+  <!-- Socket.io & Calling Script -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const localVideo = document.getElementById('local-video');
@@ -69,7 +128,6 @@
     const endBtn = document.getElementById('end-btn');
     const callStatus = document.getElementById('call-status');
 
-    // extra buttons
     const muteBtn = document.getElementById('mute-btn');
     const videoToggleBtn = document.getElementById('video-toggle-btn');
     const cameraSwitchBtn = document.getElementById('camera-switch-btn');
@@ -89,7 +147,6 @@
     audioCallBtn.addEventListener('click', () => startCall({ video: false, audio: true }));
     endBtn.addEventListener('click', endCall);
 
-    // ✅ Mute toggle
     muteBtn.onclick = () => {
       if (localStream) {
         isMuted = !isMuted;
@@ -98,7 +155,6 @@
       }
     };
 
-    // ✅ Video toggle
     videoToggleBtn.onclick = () => {
       if (localStream) {
         videoEnabled = !videoEnabled;
@@ -107,7 +163,6 @@
       }
     };
 
-    // ✅ Camera switch
     cameraSwitchBtn.onclick = async () => {
       if (!localStream) return;
       usingFront = !usingFront;
@@ -116,16 +171,13 @@
         audio: true
       });
       const newVideoTrack = newStream.getVideoTracks()[0];
-
       const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
       sender.replaceTrack(newVideoTrack);
-
       localStream.getTracks().forEach(track => track.stop());
       localStream = newStream;
       localVideo.srcObject = localStream;
     };
 
-    // ✅ Speaker toggle (mobile browsers में limited support)
     speakerBtn.onclick = () => {
       speakerOn = !speakerOn;
       remoteVideo.muted = !speakerOn;
@@ -196,7 +248,6 @@
       socket.emit('call-ended');
     }
 
-    // ✅ Incoming offer
     socket.on('offer', async (offer) => {
       const isReady = confirm('📞 एक कॉल आ रही है। क्या आप उत्तर देना चाहते हैं?');
       if (isReady) {
@@ -210,7 +261,7 @@
           const mediaConstraints = offer.sdp.includes('m=video') ? { video: true, audio: true } : { video: false, audio: true };
           localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
           localVideo.srcObject = localStream;
-          
+
           peerConnection = new RTCPeerConnection(servers);
           localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
