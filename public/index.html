@@ -133,6 +133,23 @@ video {
             "kumarikiransah2001@gmail.com": true,
             "prakashkumarraushan1@gmail.com": true
         };
+      
+      
+      
+      auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+.then(() => {
+    console.log("✅ Firebase Auth persistence LOCAL सेट हो गया");
+})
+.catch((error) => {
+    console.error("Persistence error:", error);
+});
+
+      
+      
+      
+      
+      
+      
 
         const loginBtn = document.getElementById("login-btn");
         const logoutBtn = document.getElementById("logout-btn");
@@ -211,10 +228,9 @@ video {
       
       
       
-      
-      auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(user => {
     if (user) {
-        if (allowedUsers[user.email] && isUnlocked) {
+        if (allowedUsers[user.email]) {
             currentUserEmail = user.email;
             userInfo.innerHTML = "लॉगिन: " + user.email;
             loginBtn.style.display = "none";
@@ -227,15 +243,16 @@ video {
 
             if (!socket) initSocket();
             socket.emit('register', currentUserEmail);
+
+            // ✅ अगर पेज refresh हुआ है तो बस lock दिखाओ
+            if (!isUnlocked) {
+                showLock();
+            }
         } else {
-            alert("❌ यह Gmail अलाउड नहीं है या पेज अनलॉक नहीं है!");
+            alert("❌ यह Gmail अलाउड नहीं है!");
             auth.signOut();
         }
-    } 
-    // ❌ पहले यहां auto logout हो रहा था
-    // else {
-    //     showLock();
-    // }
+    }
 });
 
       
