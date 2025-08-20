@@ -205,47 +205,99 @@ video {
             auth.signOut();
         };
 
-        auth.onAuthStateChanged(user => {
-            // यदि उपयोगकर्ता लॉग इन है
-            if (user) {
-                // जांच करें कि क्या वह एक अनुमत उपयोगकर्ता है
-                if (allowedUsers[user.email] && isUnlocked) {
-                    currentUserEmail = user.email;
-                    userInfo.innerHTML = "लॉगिन: " + user.email;
-                    loginBtn.style.display = "none";
-                    logoutBtn.style.display = "inline-block";
-                    controls.style.display = "flex";
+      
+      
+      
+      
+      
+      
+      
+      auth.onAuthStateChanged(user => {
+    if (user) {
+        if (allowedUsers[user.email] && isUnlocked) {
+            currentUserEmail = user.email;
+            userInfo.innerHTML = "लॉगिन: " + user.email;
+            loginBtn.style.display = "none";
+            logoutBtn.style.display = "inline-block";
+            controls.style.display = "flex";
 
-                    if (user.email === "kumarikiransah2001@gmail.com") {
-                        targetEmail = "prakashkumarraushan1@gmail.com";
-                    } else {
-                        targetEmail = "kumarikiransah2001@gmail.com";
-                    }
+            targetEmail = (user.email === "kumarikiransah2001@gmail.com") 
+                ? "prakashkumarraushan1@gmail.com" 
+                : "kumarikiransah2001@gmail.com";
 
-                    if (!socket) initSocket();
-                    socket.emit('register', currentUserEmail);
-                } else {
-                    // यदि वह अनुमत नहीं है या अनलॉक नहीं हुआ है तो लॉगआउट कर दें
-                    alert("❌ यह Gmail अलाउड नहीं है या पेज अनलॉक नहीं है!");
-                    auth.signOut();
-                }
-            } else {
-                // यदि उपयोगकर्ता लॉगआउट हो गया है
-                currentUserEmail = null;
-                targetEmail = null;
-                userInfo.innerHTML = "";
-                loginBtn.style.display = "inline-block";
-                logoutBtn.style.display = "none";
-                controls.style.display = "none";
-                
-                // केवल तभी लॉक स्क्रीन दिखाएं जब कोई उपयोगकर्ता लॉग इन न हो
-                if (isUnlocked) {
-                     // अगर उपयोगकर्ता ने अनलॉक किया था लेकिन वह लॉगआउट हो गया, तो इसे रीसेट करें
-                     isUnlocked = false;
-                }
-                showLock();
-            }
-        });
+            if (!socket) initSocket();
+            socket.emit('register', currentUserEmail);
+        } else {
+            alert("❌ यह Gmail अलाउड नहीं है या पेज अनलॉक नहीं है!");
+            auth.signOut();
+        }
+    } 
+    // ❌ पहले यहां auto logout हो रहा था
+    // else {
+    //     showLock();
+    // }
+});
+
+      
+      
+      
+      
+      
+      
+      
+  //   auth.onAuthStateChanged(user => {
+  //       // यदि उपयोगकर्ता लॉग इन है
+  //       if (user) {
+  //           // जांच करें कि क्या वह एक अनुमत उपयोगकर्ता है
+  //           if (allowedUsers[user.email] && isUnlocked) {
+  //               currentUserEmail = user.email;
+  //               userInfo.innerHTML = "लॉगिन: " + user.email;
+  //               loginBtn.style.display = "none";
+  //               logoutBtn.style.display = "inline-block";
+  //               controls.style.display = "flex";
+
+  //               if (user.email === "kumarikiransah2001@gmail.com") {
+  //                   targetEmail = "prakashkumarraushan1@gmail.com";
+  //               } else {
+  //                   targetEmail = "kumarikiransah2001@gmail.com";
+  //               }
+
+  //               if (!socket) initSocket();
+  //               socket.emit('register', currentUserEmail);
+  //           } else {
+  //               // यदि वह अनुमत नहीं है या अनलॉक नहीं हुआ है तो लॉगआउट कर दें
+  //               alert("❌ यह Gmail अलाउड नहीं है या पेज अनलॉक नहीं है!");
+  //               auth.signOut();
+  //           }
+  //       } else {
+  //           // यदि उपयोगकर्ता लॉगआउट हो गया है
+  //           currentUserEmail = null;
+  //           targetEmail = null;
+  //           userInfo.innerHTML = "";
+  //           loginBtn.style.display = "inline-block";
+  //           logoutBtn.style.display = "none";
+  //           controls.style.display = "none";
+  //           
+  //           // केवल तभी लॉक स्क्रीन दिखाएं जब कोई उपयोगकर्ता लॉग इन न हो
+  //           if (isUnlocked) {
+  //                // अगर उपयोगकर्ता ने अनलॉक किया था लेकिन वह लॉगआउट हो गया, तो इसे रीसेट करें
+  //                isUnlocked = false;
+  //           }
+  //           showLock();
+  //       }
+  //   });
+  
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
 
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) showLock();
