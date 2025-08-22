@@ -1,93 +1,243 @@
 <!DOCTYPE html>
-<html>
+<html lang="hi">
 <head>
-    <title>वीडियो कॉल ऐप</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>मेरा सुकून: वीडियो कॉल</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #f0f0f0; padding: 20px; }
-        #video-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
-        video { width: 45%; height: auto; border: 2px solid #333; }
-        #controls { margin-top: 20px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f2f7; /* हल्का नीला बैकग्राउंड */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 95%;
+            max-width: 1000px;
+            text-align: center;
+            margin: 20px;
+        }
+        h1 {
+            color: #00796b; /* गहरा हरा */
+            font-size: 2.5rem;
+            margin-bottom: 25px;
+            font-weight: 700;
+        }
+        .video-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .video-box {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 आस्पेक्ट रेशियो */
+            background-color: #eceff1; /* हल्का ग्रे */
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* वीडियो को बॉक्स में फ़िट करें */
+            border-radius: 10px;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap; /* छोटे स्क्रीन के लिए */
+            justify-content: center;
+            gap: 15px;
+        }
+        button {
+            background-color: #00796b; /* गहरा हरा */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0, 121, 107, 0.3);
+        }
+        button:hover:not(:disabled) {
+            background-color: #004d40; /* गहरा हरा */
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background-color: #b0bec5; /* ग्रे */
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* मोबाइल रेस्पॉन्सिवनेस */
+        @media (min-width: 768px) {
+            .video-wrapper {
+                flex-direction: row;
+                justify-content: center;
+            }
+            .video-box {
+                width: 48%; /* डेस्कटॉप पर दो वीडियो एक साथ */
+                padding-top: calc(48% * 0.5625); /* आस्पेक्ट रेशियो बनाए रखें */
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>वीडियो कॉल</h1>
-    <div id="video-container">
-        <video id="localVideo" autoplay muted></video>
-        <video id="remoteVideo" autoplay></video>
+    <div class="container">
+        <h1>मेरा सुकून</h1>
+        <div class="video-wrapper">
+            <div class="video-box">
+                <video id="localVideo" autoplay muted></video>
+            </div>
+            <div class="video-box">
+                <video id="remoteVideo" autoplay></video>
+            </div>
+        </div>
+        <div class="controls">
+            <button id="startCallBtn">कॉल शुरू करें</button>
+            <button id="endCallBtn" disabled>कॉल खत्म करें</button>
+        </div>
     </div>
-    <div id="controls">
-        <button id="startCallBtn">कॉल शुरू करें</button>
-        <button id="endCallBtn" disabled>कॉल खत्म करें</button>
-    </div>
+
+    <!-- Socket.IO क्लाइंट लाइब्रेरी को लोड करें -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // HTML एलिमेंट्स प्राप्त करें
         const localVideo = document.getElementById('localVideo');
         const remoteVideo = document.getElementById('remoteVideo');
         const startCallBtn = document.getElementById('startCallBtn');
         const endCallBtn = document.getElementById('endCallBtn');
 
-        const socket = io();
-        let localStream;
-        let peerConnection;
+        let socket;
+        // Socket.IO को सर्वर से कनेक्ट करें
+        // लोकल डेवलपमेंट और Render डिप्लॉयमेंट के लिए URL हैंडल करें
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            socket = io(); // लोकलहोस्ट के लिए
+            console.log("लोकल Socket.IO सर्वर से कनेक्ट किया गया।");
+        } else {
+            // Render पर डिप्लॉयमेंट के लिए अपने Render ऐप का URL यहाँ डालें
+            // यह URL Render द्वारा प्रदान किया जाएगा, जैसे mera-sukun.onrender.com
+            // सुनिश्चित करें कि यह आपके Render ऐप का सही URL है
+            socket = io('https://mera-sukun.onrender.com'); // Render URL
+            console.log("Render Socket.IO सर्वर से कनेक्ट किया गया।");
+        }
+        
 
+        let localStream; // लोकल ऑडियो/वीडियो स्ट्रीम
+        let peerConnection; // WebRTC पीयर कनेक्शन
+
+        // STUN सर्वर कॉन्फ़िगरेशन
+        // STUN सर्वर NAT ट्रैवर्सल में मदद करते हैं ताकि पियर्स एक-दूसरे को ढूंढ सकें।
+        // आप सार्वजनिक Google STUN सर्वर का उपयोग कर रहे हैं।
         const servers = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' } // एक पब्लिक STUN सर्वर
+                { urls: 'stun:stun.l.google.com:19302' } 
+                // अगर NAT/फ़ायरवॉल के पीछे से कनेक्शन में समस्या आती है,
+                // तो आपको एक TURN सर्वर (जैसे Coturn) की आवश्यकता होगी।
+                // उदाहरण: { urls: 'turn:your-turn-server.com:3478', username: 'user', credential: 'password' }
             ]
         };
 
-        // लोकल मीडिया स्ट्रीम प्राप्त करें
+        // लोकल मीडिया स्ट्रीम (कैमरा और माइक्रोफ़ोन) प्राप्त करें
         async function getLocalStream() {
             try {
+                // उपयोगकर्ता से वीडियो और ऑडियो एक्सेस करने की अनुमति मांगें
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                localVideo.srcObject = localStream;
+                localVideo.srcObject = localStream; // लोकल वीडियो एलिमेंट में स्ट्रीम दिखाएँ
+                console.log('लोकल स्ट्रीम प्राप्त हुई।');
             } catch (error) {
                 console.error('लोकल स्ट्रीम प्राप्त करने में त्रुटि:', error);
+                alert('कैमरा और माइक्रोफ़ोन एक्सेस करने की अनुमति नहीं मिली। कृपया अनुमति दें।');
             }
         }
 
-        // कॉल शुरू करें
+        // कॉल शुरू करने के लिए बटन पर क्लिक इवेंट हैंडलर
         startCallBtn.addEventListener('click', async () => {
+            // सबसे पहले लोकल स्ट्रीम प्राप्त करें
             await getLocalStream();
-            peerConnection = new RTCPeerConnection(servers);
 
-            // लोकल ट्रैक को पीयर कनेक्शन में जोड़ें
+            if (!localStream) {
+                console.error("कॉल शुरू करने के लिए लोकल स्ट्रीम उपलब्ध नहीं है।");
+                return;
+            }
+
+            // एक नया RTCPeerConnection बनाएँ
+            peerConnection = new RTCPeerConnection(servers);
+            console.log('RTCPeerConnection बनाया गया।');
+
+            // लोकल स्ट्रीम के सभी ट्रैक (वीडियो और ऑडियो) को पीयर कनेक्शन में जोड़ें
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
+                console.log('लोकल ट्रैक पीयर कनेक्शन में जोड़े गए।');
             });
 
-            // रिमोट स्ट्रीम प्राप्त होने पर
+            // जब रिमोट स्ट्रीम प्राप्त होती है, तो उसे remoteVideo एलिमेंट में दिखाएँ
             peerConnection.ontrack = (event) => {
-                remoteVideo.srcObject = event.streams[0];
-            };
-
-            // ICE कैंडिडेट प्राप्त होने पर
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('ice-candidate', event.candidate);
+                // सुनिश्चित करें कि केवल पहली स्ट्रीम जोड़ी जाए
+                if (remoteVideo.srcObject !== event.streams[0]) {
+                    remoteVideo.srcObject = event.streams[0];
+                    console.log('रिमोट स्ट्रीम प्राप्त हुई और दिखाई गई।');
                 }
             };
 
-            // ऑफ़र बनाएँ और भेजें
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            socket.emit('call-offer', peerConnection.localDescription);
+            // जब ICE कैंडिडेट (नेटवर्क पता जानकारी) उपलब्ध होता है
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // ICE कैंडिडेट को सिग्नलिंग सर्वर के माध्यम से दूसरे पीयर को भेजें
+                    socket.emit('ice-candidate', event.candidate);
+                    console.log('ICE कैंडिडेट भेजा गया:', event.candidate);
+                }
+            };
 
+            // WebRTC ऑफ़र बनाएँ (कॉल शुरू करने वाले के लिए)
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer); // ऑफ़र को लोकल डिस्क्रिप्शन के रूप में सेट करें
+
+            // ऑफ़र को सिग्नलिंग सर्वर के माध्यम से दूसरे पीयर को भेजें
+            socket.emit('call-offer', peerConnection.localDescription);
+            console.log('कॉल ऑफ़र भेजा गया।');
+
+            // बटन स्टेट अपडेट करें
             startCallBtn.disabled = true;
             endCallBtn.disabled = false;
         });
 
-        // सिग्नलिंग: ऑफ़र प्राप्त होने पर
+        // सिग्नलिंग: 'call-offer' इवेंट हैंडलर (कॉल प्राप्त करने वाले के लिए)
         socket.on('call-offer', async (offer) => {
+            console.log('कॉल ऑफ़र प्राप्त हुआ।');
+            // अगर अभी तक कोई पीयर कनेक्शन नहीं बना है, तो नया बनाएँ
             if (!peerConnection) {
-                await getLocalStream();
+                await getLocalStream(); // लोकल स्ट्रीम प्राप्त करें
+                if (!localStream) {
+                    console.error("कॉल स्वीकार करने के लिए लोकल स्ट्रीम उपलब्ध नहीं है।");
+                    return;
+                }
                 peerConnection = new RTCPeerConnection(servers);
                 localStream.getTracks().forEach(track => {
                     peerConnection.addTrack(track, localStream);
                 });
                 peerConnection.ontrack = (event) => {
-                    remoteVideo.srcObject = event.streams[0];
+                    if (remoteVideo.srcObject !== event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
                 };
                 peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
@@ -96,27 +246,66 @@
                 };
             }
 
+            // प्राप्त ऑफ़र को रिमोट डिस्क्रिप्शन के रूप में सेट करें
             await peerConnection.setRemoteDescription(offer);
+            // WebRTC आंसर बनाएँ और भेजें
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
             socket.emit('call-answer', peerConnection.localDescription);
+            console.log('कॉल जवाब भेजा गया।');
 
+            // बटन स्टेट अपडेट करें
             startCallBtn.disabled = true;
             endCallBtn.disabled = false;
         });
 
-        // सिग्नलिंग: आंसर प्राप्त होने पर
+        // सिग्नलिंग: 'call-answer' इवेंट हैंडलर (कॉल शुरू करने वाले के लिए)
         socket.on('call-answer', async (answer) => {
+            console.log('कॉल जवाब प्राप्त हुआ।');
+            // प्राप्त आंसर को रिमोट डिस्क्रिप्शन के रूप में सेट करें
             await peerConnection.setRemoteDescription(answer);
         });
 
-        // सिग्नलिंग: ICE कैंडिडेट प्राप्त होने पर
+        // सिग्नलिंग: 'ice-candidate' इवेंट हैंडलर
         socket.on('ice-candidate', async (candidate) => {
-            await peerConnection.addIceCandidate(candidate);
+            console.log('ICE कैंडिडेट प्राप्त हुआ।');
+            // प्राप्त ICE कैंडिडेट को पीयर कनेक्शन में जोड़ें
+            try {
+                await peerConnection.addIceCandidate(candidate);
+                console.log('ICE कैंडिडेट सफलतापूर्वक जोड़ा गया।');
+            } catch (e) {
+                console.error('ICE कैंडिडेट जोड़ने में त्रुटि:', e);
+            }
         });
 
-        // कॉल खत्म करें
+        // कॉल समाप्त करने के लिए बटन पर क्लिक इवेंट हैंडलर
         endCallBtn.addEventListener('click', () => {
+            console.log('कॉल समाप्त की जा रही है।');
+            if (peerConnection) {
+                peerConnection.close(); // पीयर कनेक्शन बंद करें
+                peerConnection = null;
+            }
+            if (localStream) {
+                // लोकल स्ट्रीम के सभी ट्रैक बंद करें
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            // वीडियो एलिमेंट्स को खाली करें
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+
+            // बटन स्टेट अपडेट करें
+            startCallBtn.disabled = false;
+            endCallBtn.disabled = true;
+
+            // सिग्नलिंग सर्वर को सूचित करें कि कॉल समाप्त हो गई है
+            socket.emit('call-end');
+            console.log('कॉल समाप्त हुई और सर्वर को सूचित किया गया।');
+        });
+
+        // जब कोई अन्य उपयोगकर्ता कॉल समाप्त करता है, तो इस इवेंट को हैंडल करें
+        socket.on('call-end', () => {
+            console.log('रिमोट पीयर ने कॉल समाप्त की।');
             if (peerConnection) {
                 peerConnection.close();
                 peerConnection = null;
@@ -129,8 +318,15 @@
             remoteVideo.srcObject = null;
             startCallBtn.disabled = false;
             endCallBtn.disabled = true;
-            socket.emit('call-end');
+            // यहां आप एक संदेश दिखा सकते हैं कि कॉल समाप्त हो गई है
+            // alert('कॉल समाप्त हो गई है।');
         });
+
+        // पेज लोड होने पर लोकल स्ट्रीम प्राप्त करने का प्रयास करें
+        // ताकि उपयोगकर्ता कॉल शुरू करने से पहले अपना वीडियो देख सकें
+        window.onload = () => {
+            getLocalStream();
+        };
     </script>
 </body>
 </html>
