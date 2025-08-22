@@ -1,90 +1,60 @@
-// server.js
+// आवश्यक मॉड्यूल आयात करें
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const { Server } = require('socket.io');
+const path = require('path');
 
+// Express app और http सर्वर शुरू करें
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
 
-app.use(express.static('public'));
+// Socket.IO सर्वर शुरू करें
+const io = new Server(server);
 
-// Maps
-// email -> socketId
-let usersByEmail = {};
-// socketId -> email
-let emailBySocket = {};
+// अपने HTML फ़ाइल को सर्व करें
+// यह सुनिश्चित करेगा कि जब भी कोई यूजर आपकी वेबसाइट खोलेगा, तो index.html पेज दिखेगा।
+app.use(express.static(path.join(__dirname, '')));
 
+// Socket.IO कनेक्शन को हैंडल करें
 io.on('connection', (socket) => {
-    console.log(`एक उपयोगकर्ता जुड़ा: ${socket.id}`);
+  console.log('एक नया यूजर कनेक्ट हुआ है:', socket.id);
 
-    // Register with email (frontend sends this after successful Firebase login)
-    socket.on('register', (email) => {
-        usersByEmail[email] = socket.id;
-        emailBySocket[socket.id] = email;
-        console.log(`Registered ${email} => ${socket.id}`);
-    });
+  // 'offer' सिग्नल को हैंडल करें और इसे दूसरे यूजर को भेजें
+  socket.on('offer', (offer) => {
+    console.log('एक ऑफर प्राप्त हुआ');
+    // ऑफर को भेजने वाले को छोड़कर बाकी सभी को भेजें
+    socket.broadcast.emit('offer', offer);
+  });
 
-    // Unregister (on logout)
-    socket.on('unregister', (email) => {
-        if (usersByEmail[email] === socket.id) {
-            delete usersByEmail[email];
-        }
-        delete emailBySocket[socket.id];
-        console.log(`Unregistered ${email}`);
-    });
+  // 'answer' सिग्नल को हैंडल करें
+  socket.on('answer', (answer) => {
+    console.log('एक उत्तर प्राप्त हुआ');
+    // उत्तर को भेजने वाले को छोड़कर बाकी सभी को भेजें
+    socket.broadcast.emit('answer', answer);
+  });
 
-    // Offer: caller -> targetEmail
-    socket.on('offer', ({ offer, targetEmail }) => {
-        const targetId = usersByEmail[targetEmail];
-        if (targetId) {
-            io.to(targetId).emit('offer', { offer, from: socket.id, fromEmail: emailBySocket[socket.id] || null });
-            console.log(`Offer from ${socket.id} -> ${targetId} (${targetEmail})`);
-        } else {
-            // target offline / not registered
-            io.to(socket.id).emit('user-unavailable', { message: 'Target user not available' });
-            console.log(`Target ${targetEmail} not available for offer`);
-        }
-    });
+  // 'ice-candidate' सिग्नल को हैंडल करें
+  socket.on('ice-candidate', (candidate) => {
+    console.log('एक ICE कैंडिडेट प्राप्त हुआ');
+    // कैंडिडेट को भेजने वाले को छोड़कर बाकी सभी को भेजें
+    socket.broadcast.emit('ice-candidate', candidate);
+  });
 
-    // Answer: callee -> targetId (which is caller's socket id)
-    socket.on('answer', ({ answer, targetId }) => {
-        io.to(targetId).emit('answer', { answer, from: socket.id, fromEmail: emailBySocket[socket.id] || null });
-        console.log(`Answer from ${socket.id} -> ${targetId}`);
-    });
+  // 'call-ended' सिग्नल को हैंडल करें
+  socket.on('call-ended', () => {
+    console.log('एक कॉल समाप्त हो गई है');
+    // कॉल समाप्त होने की सूचना सभी को दें
+    socket.broadcast.emit('call-ended');
+  });
 
-    // ICE candidate: accept either targetId (socketId) or targetEmail
-    socket.on('ice-candidate', ({ candidate, targetId, targetEmail }) => {
-        let dest = targetId;
-        if (!dest && targetEmail) dest = usersByEmail[targetEmail];
-        if (dest) {
-            io.to(dest).emit('ice-candidate', { candidate, from: socket.id });
-            //console.log(`ICE from ${socket.id} -> ${dest}`);
-        } else {
-            // ignore or notify
-            console.log('ICE target not found');
-        }
-    });
-
-    // call-ended: notify the other side if possible (targetId or targetEmail)
-    socket.on('call-ended', ({ targetId, targetEmail } = {}) => {
-        let dest = targetId || (targetEmail && usersByEmail[targetEmail]);
-        if (dest) io.to(dest).emit('call-ended');
-    });
-
-    socket.on('disconnect', () => {
-        const email = emailBySocket[socket.id];
-        if (email) {
-            delete usersByEmail[email];
-            delete emailBySocket[socket.id];
-            console.log(`डिस्कनेक्ट और रिमूव हुआ: ${email} (${socket.id})`);
-        } else {
-            console.log(`डिस्कनेक्ट: ${socket.id}`);
-        }
-    });
+  // जब कोई यूजर डिस्कनेक्ट होता है
+  socket.on('disconnect', () => {
+    console.log('यूजर डिस्कनेक्ट हुआ है:', socket.id);
+  });
 });
 
+// सर्वर को लोकलहोस्ट पर पोर्ट 3000 पर चालू करें
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`सर्वर http://localhost:${PORT} पर चल रहा है`);
+  console.log(`सर्वर http://localhost:${PORT} पर चल रहा है`);
 });
