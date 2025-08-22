@@ -1,60 +1,42 @@
-// आवश्यक मॉड्यूल आयात करें
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-
-// Express app और http सर्वर शुरू करें
 const app = express();
-const server = http.createServer(app);
+const http = require('http').Server(app);
+const io = require('socket.io')(http);
 
-// Socket.IO सर्वर शुरू करें
-const io = new Server(server);
+// स्टैटिक फ़ाइलें सर्व करें
+app.use(express.static(__dirname));
 
-// अपने HTML फ़ाइल को सर्व करें
-// यह सुनिश्चित करेगा कि जब भी कोई यूजर आपकी वेबसाइट खोलेगा, तो index.html पेज दिखेगा।
-app.use(express.static(path.join(__dirname, '')));
+// रूट पेज सर्व करें
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 
-// Socket.IO कनेक्शन को हैंडल करें
+// Socket.IO कनेक्शन
 io.on('connection', (socket) => {
-  console.log('एक नया यूजर कनेक्ट हुआ है:', socket.id);
+  console.log('एक उपयोगकर्ता कनेक्ट हुआ');
 
-  // 'offer' सिग्नल को हैंडल करें और इसे दूसरे यूजर को भेजें
-  socket.on('offer', (offer) => {
-    console.log('एक ऑफर प्राप्त हुआ');
-    // ऑफर को भेजने वाले को छोड़कर बाकी सभी को भेजें
-    socket.broadcast.emit('offer', offer);
+  socket.on('call-offer', (offer) => {
+    socket.broadcast.emit('call-offer', offer);
   });
 
-  // 'answer' सिग्नल को हैंडल करें
-  socket.on('answer', (answer) => {
-    console.log('एक उत्तर प्राप्त हुआ');
-    // उत्तर को भेजने वाले को छोड़कर बाकी सभी को भेजें
-    socket.broadcast.emit('answer', answer);
+  socket.on('call-answer', (answer) => {
+    socket.broadcast.emit('call-answer', answer);
   });
 
-  // 'ice-candidate' सिग्नल को हैंडल करें
   socket.on('ice-candidate', (candidate) => {
-    console.log('एक ICE कैंडिडेट प्राप्त हुआ');
-    // कैंडिडेट को भेजने वाले को छोड़कर बाकी सभी को भेजें
     socket.broadcast.emit('ice-candidate', candidate);
   });
 
-  // 'call-ended' सिग्नल को हैंडल करें
-  socket.on('call-ended', () => {
-    console.log('एक कॉल समाप्त हो गई है');
-    // कॉल समाप्त होने की सूचना सभी को दें
-    socket.broadcast.emit('call-ended');
+  socket.on('call-end', () => {
+    socket.broadcast.emit('call-end');
   });
 
-  // जब कोई यूजर डिस्कनेक्ट होता है
   socket.on('disconnect', () => {
-    console.log('यूजर डिस्कनेक्ट हुआ है:', socket.id);
+    console.log('उपयोगकर्ता डिस्कनेक्ट हुआ');
   });
 });
 
-// सर्वर को लोकलहोस्ट पर पोर्ट 3000 पर चालू करें
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+http.listen(PORT, () => {
   console.log(`सर्वर http://localhost:${PORT} पर चल रहा है`);
 });
