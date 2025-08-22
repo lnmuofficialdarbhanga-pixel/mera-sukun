@@ -130,7 +130,7 @@ video {
         const auth = firebase.auth();
 
         const allowedUsers = {
-            "kumarikiransah2001@gmail.com": true,
+            "pkr.allservices@gmail.com": true,
             "prakashkumarraushan1@gmail.com": true
         };
       
@@ -230,9 +230,9 @@ auth.onAuthStateChanged(user => {
             logoutBtn.style.display = "inline-block";
             controls.style.display = "flex";
 
-            targetEmail = (user.email === "kumarikiransah2001@gmail.com") 
+            targetEmail = (user.email === "pkr.allservices@gmail.com") 
                 ? "prakashkumarraushan1@gmail.com" 
-                : "kumarikiransah2001@gmail.com";
+                : "pkr.allservices@gmail.com";
 
             if (!socket) initSocket();
             socket.emit('register', currentUserEmail);
