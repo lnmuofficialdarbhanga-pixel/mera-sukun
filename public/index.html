@@ -457,7 +457,7 @@ auth.onAuthStateChanged(user => {
         };
         async function startCall(mediaConstraints) {
             const user = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
-            if (!user || !(['kumarikiransah2001@gmail.com','prakashkumarraushan1@gmail.com'].includes(user))) {
+            if (!user || !(['pkr.allservices@gmail.com','prakashkumarraushan1@gmail.com'].includes(user))) {
                 alert('कृपया पहले लॉगिन करें और सही उपयोगकर्ता हों।');
                 return;
             }
